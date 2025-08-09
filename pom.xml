@@ -57,5 +57,10 @@
             <version>1.21-R0.3</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>31.1-jre</version>
+        </dependency>
     </dependencies>
 </project>

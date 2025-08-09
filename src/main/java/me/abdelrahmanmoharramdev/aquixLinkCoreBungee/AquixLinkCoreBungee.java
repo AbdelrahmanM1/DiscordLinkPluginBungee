@@ -3,6 +3,7 @@ package me.abdelrahmanmoharramdev.aquixLinkCoreBungee;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands.LinkCommand;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands.ReloadLinkCommand;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands.UnlinkCommand;
+import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.Listeners.PlayerJoinListener;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands.VerifyLinkCommand;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.storage.LinkStorage;
 import net.md_5.bungee.api.ProxyServer;
@@ -29,6 +30,8 @@ public final class AquixLinkCoreBungee extends Plugin {
         ProxyServer.getInstance().getPluginManager().registerCommand(this, new UnlinkCommand());
         ProxyServer.getInstance().getPluginManager().registerCommand(this, new ReloadLinkCommand());
         ProxyServer.getInstance().getPluginManager().registerCommand(this, new VerifyLinkCommand());
+        // Register Events
+        getProxy().getPluginManager().registerListener(this, new PlayerJoinListener());
 
         getLogger().info("AquixLinkCoreBungee has been enabled! Development by 3bdoabk");
     }
