@@ -40,6 +40,7 @@ public class PlayerJoinListener implements Listener {
                     ChatColor.DARK_GREEN + "" + ChatColor.BOLD + "Welcome back to AquixMC, " + player.getName() + "!",
                     ChatColor.YELLOW + "Your Minecraft account is already linked with your Discord.",
                     ChatColor.GRAY + "You now have full access to our Discord-linked features.",
+                    ChatColor.DARK_GREEN + "Enjoy your stay at " + ChatColor.BOLD + "AquixMC" + ChatColor.DARK_GREEN + "!",
                     SEPARATOR_GREEN
             );
         }
