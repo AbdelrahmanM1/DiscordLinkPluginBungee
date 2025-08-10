@@ -1,6 +1,7 @@
 package me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands;
 
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.AquixLinkCoreBungee;
+import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.Discord.DiscordBot;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.storage.LinkStorage;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.CommandSender;
@@ -27,11 +28,12 @@ public class LinkCommand extends Command {
         }
 
         ProxiedPlayer player = (ProxiedPlayer) sender;
-        LinkStorage linkStorage = AquixLinkCoreBungee.getInstance().getLinkStorage();
+        AquixLinkCoreBungee plugin = AquixLinkCoreBungee.getInstance();
+        LinkStorage linkStorage = plugin.getLinkStorage();
 
         if (linkStorage == null) {
             player.sendMessage(ChatColor.RED + "Internal error: link storage unavailable.");
-            AquixLinkCoreBungee.getInstance().getLogger().severe("LinkStorage instance is null in LinkCommand.");
+            plugin.getLogger().severe("LinkStorage instance is null in LinkCommand.");
             return;
         }
 
@@ -49,7 +51,8 @@ public class LinkCommand extends Command {
                 linkStorage.removePendingVerification(player.getUniqueId());
             } else {
                 player.sendMessage(ChatColor.RED + "You already have a pending verification request.");
-                player.sendMessage(ChatColor.GRAY + "Use " + ChatColor.YELLOW + "/verifylink <code>" + ChatColor.GRAY + " to complete linking.");
+                player.sendMessage(ChatColor.GRAY + "Check your Discord DM or use " +
+                        ChatColor.YELLOW + "/verifylink <code>" + ChatColor.GRAY + " to complete linking.");
                 return;
             }
         }
@@ -78,10 +81,17 @@ public class LinkCommand extends Command {
         String code = String.format("%0" + CODE_LENGTH + "d", random.nextInt(MAX_CODE));
         linkStorage.setPendingVerification(player.getUniqueId(), discordId, code);
 
-        // Send success messages
-        player.sendMessage(ChatColor.GREEN + "✅ A verification code has been generated.");
-        player.sendMessage(ChatColor.GRAY + "To complete the process, type:");
-        player.sendMessage(ChatColor.YELLOW + "/verifylink " + code);
+        // Send Discord DM with the verification code
+        DiscordBot bot = plugin.getDiscordBot();
+        if (bot != null) {
+            bot.sendVerificationDM(discordId, player.getName(), code);
+            player.sendMessage(ChatColor.GREEN + "✅ A verification code has been generated and sent to your Discord DMs.");
+        } else {
+            player.sendMessage(ChatColor.YELLOW + "⚠ Verification code generated, but the Discord bot is offline.");
+        }
+
+        // Remind in chat
         player.sendMessage(ChatColor.GRAY + "Note: This code is valid for 5 minutes.");
+        player.sendMessage(ChatColor.GRAY + "If you didn't get a DM, make sure your privacy settings allow messages from server members.");
     }
 }

@@ -4,7 +4,7 @@
   <groupId>me.abdelrahmanmoharramdev</groupId>
   <artifactId>AquixLinkCoreBungee</artifactId>
   <name>AquixLinkCoreBungee</name>
-  <version>1.0</version>
+  <version>1.2</version>
   <build>
     <defaultGoal>clean package</defaultGoal>
     <resources>
@@ -41,6 +41,12 @@
       <groupId>net.md-5</groupId>
       <artifactId>bungeecord-api</artifactId>
       <version>1.21-R0.3</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.luckperms</groupId>
+      <artifactId>api</artifactId>
+      <version>5.4</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>

@@ -1,6 +1,7 @@
 package me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands;
 
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.AquixLinkCoreBungee;
+import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.Discord.DiscordBot;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.storage.LinkStorage;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.CommandSender;
@@ -21,14 +22,15 @@ public class VerifyLinkCommand extends Command {
         }
 
         ProxiedPlayer player = (ProxiedPlayer) sender;
-        LinkStorage linkStorage = AquixLinkCoreBungee.getInstance().getLinkStorage();
+        AquixLinkCoreBungee plugin = AquixLinkCoreBungee.getInstance();
+        LinkStorage linkStorage = plugin.getLinkStorage();
 
         if (linkStorage == null) {
             player.sendMessage(ChatColor.RED + "Internal error: Link storage unavailable.");
+            plugin.getLogger().severe("LinkStorage instance is null in VerifyLinkCommand.");
             return;
         }
 
-        // Already linked
         if (linkStorage.isPlayerLinked(player.getUniqueId())) {
             player.sendMessage(ChatColor.RED + "You are already linked to a Discord account.");
             return;
@@ -41,28 +43,44 @@ public class VerifyLinkCommand extends Command {
 
         String code = args[0];
 
-        // No pending verification
         if (!linkStorage.hasPendingVerification(player.getUniqueId())) {
-            player.sendMessage(ChatColor.RED + "You have no pending link request.");
+            player.sendMessage(ChatColor.RED + "❌ You have no pending link request.");
             return;
         }
 
-        // Expired check
         if (linkStorage.isVerificationExpired(player.getUniqueId())) {
-            player.sendMessage(ChatColor.RED + "Your verification code has expired. Please use /linkdiscord again.");
+            player.sendMessage(ChatColor.RED + "⏳ Your verification code has expired. Please use /linkdiscord again.");
             linkStorage.removePendingVerification(player.getUniqueId());
             return;
         }
 
-        // Code match check
         if (!linkStorage.isCodeValid(player.getUniqueId(), code)) {
-            player.sendMessage(ChatColor.RED + "Invalid verification code.");
+            player.sendMessage(ChatColor.RED + "❌ Invalid verification code.");
             return;
         }
 
-        // Success: confirm linking and remove pending verification
+        // Get Discord ID before confirming
+        String discordId = linkStorage.getDiscordId(player.getUniqueId());
+
+        // Confirm linking
         linkStorage.confirmVerification(player.getUniqueId());
         linkStorage.removePendingVerification(player.getUniqueId());
-        player.sendMessage(ChatColor.GREEN + "Your Discord account has been successfully linked!");
+
+        player.sendMessage(ChatColor.GREEN + "✅ Your Discord account has been successfully linked!");
+
+        // DM the user via Discord if bot available
+        if (discordId != null) {
+            DiscordBot bot = plugin.getDiscordBot();
+            if (bot != null) {
+                bot.getJda().retrieveUserById(discordId).queue(user ->
+                        user.openPrivateChannel().queue(channel ->
+                                channel.sendMessage("✅ Your Minecraft account `" + player.getName() +
+                                        "` has been successfully linked to this Discord account!").queue()
+                        )
+                );
+            }
+        }
+
+        plugin.getLogger().info("Player " + player.getName() + " successfully linked to Discord ID " + discordId);
     }
 }
