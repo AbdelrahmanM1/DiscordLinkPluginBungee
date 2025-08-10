@@ -1,0 +1,14 @@
+# Time in minutes before verification codes expire
+verification-expiry-minutes: 5
+
+# Discord Bot Token (keep this secret!)
+discord-token: "YOUR_DISCORD_BOT_TOKEN"
+
+# Roles and Ranks mapping
+rolesync:
+  # Discord Role ID : Minecraft rank name
+  "123456789012345678": "vip"
+  "987654321098765432": "moderator"
+  "112233445566778899": "builder"
+  # default rank if no role matches
+  default-rank: "default"
