@@ -58,8 +58,8 @@ public class DiscordBot extends ListenerAdapter {
                     "⏳ يرجى الانتظار قبل استخدام أمر التحقق مرة أخرى."
             }),
             Map.entry("prompt_verification", new String[]{
-                    "ℹ️ Please verify yourself by using the `/verify <code>` command in this channel.",
-                    "ℹ️ يرجى التحقق من نفسك باستخدام أمر `/verify <code>` في هذه القناة."
+                    "ℹ️ Please verify yourself by using the `/verify <code>` command in this channel or using via DM.",
+                    "ℹ️ يرجى التحقق من نفسك باستخدام أمر او تستخدم الرسائل الخاصة `/verify <code>` في هذه القناة."
             }),
             Map.entry("already_linked_minecraft", new String[]{
                     "⚠️ This Minecraft account is already linked to a Discord account.",
