@@ -3,13 +3,19 @@ verification-expiry-minutes: 5
 
 # Discord Bot Token (keep this secret!)
 discord-token: "YOUR_DISCORD_BOT_TOKEN"
+
+# Discord channel ID where verification messages will be sent
 discord-verification-channel-id: 123456789012345678
 
-# Roles and Ranks mapping
+# Discord Guild ID
+discord-guild-id: 123456789012345678
+
+# Roles and Ranks mapping for syncing Discord roles to Minecraft ranks
 rolesync:
   # Discord Role ID : Minecraft rank name
   "123456789012345678": "vip"
   "987654321098765432": "moderator"
   "112233445566778899": "builder"
-  # default rank if no role matches
+
+  # Default rank to assign if no Discord role matches
   default-rank: "default"
