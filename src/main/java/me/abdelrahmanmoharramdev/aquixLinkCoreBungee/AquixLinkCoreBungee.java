@@ -42,13 +42,7 @@ public final class AquixLinkCoreBungee extends Plugin {
 
         loadConfig();
 
-        // Initialize storage handler
-        this.linkStorage = new LinkStorage(this);
-
-        // Initialize role synchronization handler
-        this.roleSync = new RoleSync(this, luckPerms);
-
-        // Hook LuckPerms API if plugin is present
+        // Hook LuckPerms API if plugin is present BEFORE initializing RoleSync
         if (getProxy().getPluginManager().getPlugin("LuckPerms") != null) {
             try {
                 luckPerms = net.luckperms.api.LuckPermsProvider.get();
@@ -64,7 +58,13 @@ public final class AquixLinkCoreBungee extends Plugin {
             getLogger().severe("⚠ LuckPerms plugin not found! Role sync will not work.");
         }
 
-        // Start Discord bot asynchronously
+        // Initialize storage handler
+        this.linkStorage = new LinkStorage(this);
+
+        // Initialize role synchronization handler with LuckPerms instance
+        this.roleSync = new RoleSync(this, luckPerms);
+
+        // Start Discord bot asynchronously to avoid blocking the main thread
         startDiscordBot();
 
         // Register commands
