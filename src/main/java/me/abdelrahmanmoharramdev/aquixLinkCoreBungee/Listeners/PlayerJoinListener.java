@@ -11,31 +11,42 @@ import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.AquixLinkCoreBungee;
 
 public class PlayerJoinListener implements Listener {
 
+    private static final String SEPARATOR = ChatColor.RED + "============================================";
+
     @EventHandler
     public void onPostLogin(PostLoginEvent event) {
         ProxiedPlayer player = event.getPlayer();
+        AquixLinkCoreBungee plugin = AquixLinkCoreBungee.getInstance();
 
-        boolean isLinked = AquixLinkCoreBungee.getInstance()
-                .getLinkStorage()
-                .isPlayerLinked(player.getUniqueId());
+        boolean isLinked = plugin.getLinkStorage().isPlayerLinked(player.getUniqueId());
 
         if (!isLinked) {
-            player.sendMessage(new TextComponent(ChatColor.RED + "============================================"));
-            player.sendMessage(new TextComponent(ChatColor.GOLD.toString() + ChatColor.BOLD + "Welcome to AquixMC, " + player.getName() + "!"));
-            player.sendMessage(new TextComponent(ChatColor.YELLOW + "It looks like your Minecraft account is " + ChatColor.RED + "NOT linked " + ChatColor.YELLOW + "with your Discord account."));
-            player.sendMessage(new TextComponent(ChatColor.GRAY + "Linking your account allows you to verify your identity, get special ranks, and access exclusive Discord channels."));
-            player.sendMessage(new TextComponent(" "));
-            player.sendMessage(new TextComponent(ChatColor.AQUA + "To link your account, simply type: " + ChatColor.GREEN + "/linkdiscord"));
-            player.sendMessage(new TextComponent(ChatColor.GRAY + "After typing the command, follow the instructions shown to complete the process."));
-            player.sendMessage(new TextComponent(" "));
-            player.sendMessage(new TextComponent(ChatColor.DARK_GREEN.toString() + ChatColor.BOLD + "Enjoy your stay at AquixMC!"));
-            player.sendMessage(new TextComponent(ChatColor.RED + "============================================"));
+            sendMessage(player,
+                    SEPARATOR,
+                    ChatColor.GOLD.toString() + ChatColor.BOLD + "Welcome to AquixMC, " + player.getName() + "!",
+                    ChatColor.YELLOW + "It looks like your Minecraft account is " + ChatColor.RED + "NOT linked " + ChatColor.YELLOW + "with your Discord account.",
+                    ChatColor.GRAY + "Linking your account allows you to verify your identity, Sync Your Roles.",
+                    " ",
+                    ChatColor.AQUA + "To link your account, simply type: " + ChatColor.GREEN + "/linkdiscord",
+                    ChatColor.GRAY + "After typing the command, follow the instructions shown to complete the process.",
+                    " ",
+                    ChatColor.DARK_GREEN.toString() + ChatColor.BOLD + "Enjoy your stay at AquixMC!",
+                    SEPARATOR
+            );
         } else {
-            player.sendMessage(new TextComponent(ChatColor.GREEN + "============================================"));
-            player.sendMessage(new TextComponent(ChatColor.DARK_GREEN.toString() + ChatColor.BOLD + "Welcome back to AquixMC, " + player.getName() + "!"));
-            player.sendMessage(new TextComponent(ChatColor.YELLOW + "Your Minecraft account is already linked with your Discord."));
-            player.sendMessage(new TextComponent(ChatColor.GRAY + "You now have full access to our Discord-linked features."));
-            player.sendMessage(new TextComponent(ChatColor.GREEN + "============================================"));
+            sendMessage(player,
+                    SEPARATOR,
+                    ChatColor.DARK_GREEN.toString() + ChatColor.BOLD + "Welcome back to AquixMC, " + player.getName() + "!",
+                    ChatColor.YELLOW + "Your Minecraft account is already linked with your Discord.",
+                    ChatColor.GRAY + "You now have full access to our Discord-linked features.",
+                    SEPARATOR
+            );
+        }
+    }
+
+    private void sendMessage(ProxiedPlayer player, String... messages) {
+        for (String msg : messages) {
+            player.sendMessage(new TextComponent(msg));
         }
     }
 }

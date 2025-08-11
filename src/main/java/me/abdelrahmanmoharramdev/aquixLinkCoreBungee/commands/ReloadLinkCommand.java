@@ -32,39 +32,38 @@ public class ReloadLinkCommand extends Command {
         }
 
         try {
-            // Reload config.yml manually
-            File configFile = new File(plugin.getDataFolder(), "config.yml");
-            if (!configFile.exists()) {
-                Files.copy(plugin.getResourceAsStream("config.yml"), configFile.toPath());
-                sender.sendMessage(new TextComponent("§eDefault config.yml created."));
-            }
+            // Reload plugin config.yml
+            plugin.reloadConfig();
 
-            plugin.getProxy().getConfigurationAdapter().load(); // Reloads proxy config
             sender.sendMessage(new TextComponent("§aConfig reloaded from file."));
 
-            // Restart Discord bot if needed
-            if (plugin.getDiscordBot() != null) {
+            // Restart Discord bot if running
+            if (plugin.getDiscordBot() != null && plugin.getDiscordBot().getJda() != null) {
                 plugin.getDiscordBot().getJda().shutdownNow();
                 plugin.getLogger().info("Discord bot stopped.");
             }
 
-            String token = plugin.getProxy().getConfigurationAdapter().getString("discord-bot-token", "");
-            if (token != null && !token.isEmpty()) {
+            // Get new token and verificationChannelId from config
+            String token = plugin.getConfig().getString("discord-token", "");
+            long verificationChannelId = plugin.getConfig().getLong("discord-verification-channel-id", 0L);
+
+            if (!token.isEmpty() && verificationChannelId != 0L) {
                 plugin.getProxy().getScheduler().runAsync(plugin, () -> {
                     try {
-                        plugin.getLogger().info("Starting Discord bot after reload...");
-                        plugin.setDiscordBot(new DiscordBot(plugin, token));
+                        plugin.setDiscordBot(new DiscordBot(plugin, token, verificationChannelId));
                         plugin.getLogger().info("✅ Discord bot started successfully after reload.");
                     } catch (Exception e) {
                         plugin.getLogger().log(Level.SEVERE, "Failed to start Discord bot after reload: " + e.getMessage(), e);
                     }
                 });
+            } else {
+                sender.sendMessage(new TextComponent("§cDiscord token or verification channel ID missing or invalid in config.yml."));
             }
 
             sender.sendMessage(new TextComponent("§aAquixLinkCoreBungee reloaded successfully."));
-        } catch (IOException e) {
-            sender.sendMessage(new TextComponent("§cFailed to reload config: " + e.getMessage()));
-            plugin.getLogger().log(Level.SEVERE, "Error reloading config", e);
+        } catch (Exception e) {
+            sender.sendMessage(new TextComponent("§cFailed to reload plugin: " + e.getMessage()));
+            plugin.getLogger().log(Level.SEVERE, "Error reloading plugin", e);
         }
     }
 }

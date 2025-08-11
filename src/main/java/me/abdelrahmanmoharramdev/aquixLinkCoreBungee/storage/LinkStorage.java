@@ -9,6 +9,7 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.logging.Level;
 
 /**
  * Handles all storage-related operations for player-Discord linking, pending verifications, etc.
@@ -45,7 +46,7 @@ public class LinkStorage {
 
             cacheProcessor.cachePendingVerification(uuid, code);
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error storing pending verification for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Error storing pending verification for " + uuid, e);
         }
     }
 
@@ -62,7 +63,7 @@ public class LinkStorage {
                 return rs.next();
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error checking pending verification for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error checking pending verification for " + uuid, e);
             return false;
         }
     }
@@ -82,9 +83,29 @@ public class LinkStorage {
                 return rs.next();
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error checking code validity for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error checking code validity for " + uuid, e);
             return false;
         }
+    }
+
+    /**
+     * Gets the UUID from the pending_verifications table where both Discord ID and code match.
+     * Returns null if not found.
+     */
+    public UUID getPendingVerificationUuidByDiscordIdAndCode(String discordId, String code) {
+        String sql = "SELECT uuid FROM pending_verifications WHERE discord_id = ? AND code = ?";
+        try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
+            ps.setString(1, discordId);
+            ps.setString(2, code);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return UUID.fromString(rs.getString("uuid"));
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error getting pending verification UUID by Discord ID and code", e);
+        }
+        return null;
     }
 
     /**
@@ -107,7 +128,7 @@ public class LinkStorage {
                 }
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error checking expiry for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error checking expiry for " + uuid, e);
         }
         return true; // treat missing record as expired
     }
@@ -122,7 +143,7 @@ public class LinkStorage {
             ps.executeUpdate();
             cacheProcessor.invalidatePendingVerification(uuid);
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error removing pending verification for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error removing pending verification for " + uuid, e);
         }
     }
 
@@ -158,19 +179,18 @@ public class LinkStorage {
 
                         // Sync LuckPerms roles immediately after linking
                         syncRolesForPlayer(uuid, discordId);
-
                         return;
                     }
                 }
                 conn.rollback();
             } catch (SQLException e) {
                 conn.rollback();
-                plugin.getLogger().severe("Verification transaction failed for " + uuid + ": " + e.getMessage());
+                plugin.getLogger().log(Level.SEVERE, "Verification transaction failed for " + uuid, e);
             } finally {
                 conn.setAutoCommit(true);
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Failed to confirm verification for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Failed to confirm verification for " + uuid, e);
         }
     }
 
@@ -181,10 +201,16 @@ public class LinkStorage {
         plugin.getLogger().info("Syncing roles for player UUID: " + playerUuid + ", Discord ID: " + discordId);
 
         plugin.getDiscordBot().getJda().retrieveUserById(discordId).queue(user -> {
+            if (user == null) {
+                plugin.getLogger().warning("Discord user is null for ID: " + discordId);
+                return;
+            }
             plugin.getDiscordBot().getJda().getGuilds().forEach(guild -> {
                 guild.retrieveMember(user).queue(member -> {
                     if (member != null) {
                         plugin.getRoleSync().syncPlayerRoles(playerUuid, member);
+                    } else {
+                        plugin.getLogger().warning("Could not get guild member for role sync in guild " + guild.getName());
                     }
                 }, failure -> plugin.getLogger().warning("Could not get guild member for role sync: " + failure.getMessage()));
             });
@@ -208,7 +234,7 @@ public class LinkStorage {
                 }
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error checking linked status for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error checking linked status for " + uuid, e);
         }
         return false;
     }
@@ -231,7 +257,7 @@ public class LinkStorage {
                 }
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error getting Discord ID for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error getting Discord ID for " + uuid, e);
         }
         return null;
     }
@@ -240,6 +266,9 @@ public class LinkStorage {
      * Unlink a player from Discord, removing from links table and cache.
      */
     public void unlinkPlayer(UUID uuid) {
+        // Fetch Discord ID before deletion so we can sync roles properly
+        String discordId = getDiscordId(uuid);
+
         String sql = "DELETE FROM links WHERE uuid = ?";
         try (PreparedStatement ps = db.getConnection().prepareStatement(sql)) {
             ps.setString(1, uuid.toString());
@@ -247,20 +276,25 @@ public class LinkStorage {
             cacheProcessor.invalidateLinkedPlayer(uuid);
 
             // After unlinking, sync roles to update ranks if needed
-            String discordId = getDiscordId(uuid);
             if (discordId != null) {
                 plugin.getDiscordBot().getJda().retrieveUserById(discordId).queue(user -> {
+                    if (user == null) {
+                        plugin.getLogger().warning("Discord user is null during unlink role sync for ID: " + discordId);
+                        return;
+                    }
                     plugin.getDiscordBot().getJda().getGuilds().forEach(guild -> {
                         guild.retrieveMember(user).queue(member -> {
                             if (member != null) {
                                 plugin.getRoleSync().syncPlayerRoles(uuid, member);
+                            } else {
+                                plugin.getLogger().warning("Member null during unlink role sync in guild " + guild.getName());
                             }
-                        });
+                        }, failure -> plugin.getLogger().warning("Failed to retrieve guild member during unlink: " + failure.getMessage()));
                     });
-                });
+                }, failure -> plugin.getLogger().warning("Failed to retrieve Discord user during unlink: " + failure.getMessage()));
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error unlinking player for " + uuid + ": " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error unlinking player for " + uuid, e);
         }
     }
 
@@ -275,7 +309,7 @@ public class LinkStorage {
                 return rs.next();
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error checking if Discord ID is linked (" + discordId + "): " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error checking if Discord ID is linked (" + discordId + ")", e);
         }
         return false;
     }
@@ -293,7 +327,7 @@ public class LinkStorage {
                 }
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error getting UUID by Discord ID (" + discordId + "): " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error getting UUID by Discord ID (" + discordId + ")", e);
         }
         return null;
     }
@@ -316,7 +350,7 @@ public class LinkStorage {
                 cacheProcessor.cacheLinkedPlayer(uuid, discordId);
             }
         } catch (SQLException e) {
-            plugin.getLogger().warning("Error loading all linked players: " + e.getMessage());
+            plugin.getLogger().log(Level.WARNING, "Error loading all linked players", e);
         }
 
         return linkedPlayers;

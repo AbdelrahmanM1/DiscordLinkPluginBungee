@@ -16,71 +16,73 @@ public class VerifyLinkCommand extends Command {
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        if (!(sender instanceof ProxiedPlayer)) {
-            sender.sendMessage(ChatColor.RED + "Only players can use this command.");
+        if (!(sender instanceof ProxiedPlayer player)) {
+            sender.sendMessage(colorize("&cOnly players can use this command."));
             return;
         }
 
-        ProxiedPlayer player = (ProxiedPlayer) sender;
         AquixLinkCoreBungee plugin = AquixLinkCoreBungee.getInstance();
         LinkStorage linkStorage = plugin.getLinkStorage();
 
         if (linkStorage == null) {
-            player.sendMessage(ChatColor.RED + "Internal error: Link storage unavailable.");
+            player.sendMessage(colorize("&cInternal error: Link storage unavailable."));
             plugin.getLogger().severe("LinkStorage instance is null in VerifyLinkCommand.");
             return;
         }
 
         if (linkStorage.isPlayerLinked(player.getUniqueId())) {
-            player.sendMessage(ChatColor.RED + "You are already linked to a Discord account.");
+            player.sendMessage(colorize("&cYou are already linked to a Discord account."));
             return;
         }
 
         if (args.length != 1) {
-            player.sendMessage(ChatColor.RED + "Usage: /verifylink <code>");
+            player.sendMessage(colorize("&cUsage: /verifylink <code>"));
             return;
         }
 
         String code = args[0];
 
         if (!linkStorage.hasPendingVerification(player.getUniqueId())) {
-            player.sendMessage(ChatColor.RED + "❌ You have no pending link request.");
+            player.sendMessage(colorize("&c❌ You have no pending link request."));
             return;
         }
 
         if (linkStorage.isVerificationExpired(player.getUniqueId())) {
-            player.sendMessage(ChatColor.RED + "⏳ Your verification code has expired. Please use /linkdiscord again.");
+            player.sendMessage(colorize("&e⏳ Your verification code has expired. Please use /linkdiscord again."));
             linkStorage.removePendingVerification(player.getUniqueId());
             return;
         }
 
         if (!linkStorage.isCodeValid(player.getUniqueId(), code)) {
-            player.sendMessage(ChatColor.RED + "❌ Invalid verification code.");
+            player.sendMessage(colorize("&c❌ Invalid verification code."));
             return;
         }
 
-        // Get Discord ID before confirming
         String discordId = linkStorage.getDiscordId(player.getUniqueId());
 
-        // Confirm linking
+        // Confirm and clear pending verification
         linkStorage.confirmVerification(player.getUniqueId());
         linkStorage.removePendingVerification(player.getUniqueId());
 
-        player.sendMessage(ChatColor.GREEN + "✅ Your Discord account has been successfully linked!");
+        player.sendMessage(colorize("&a✅ Your Discord account has been successfully linked!"));
 
-        // DM the user via Discord if bot available
         if (discordId != null) {
             DiscordBot bot = plugin.getDiscordBot();
-            if (bot != null) {
+            if (bot != null && bot.getJda() != null) {
                 bot.getJda().retrieveUserById(discordId).queue(user ->
-                        user.openPrivateChannel().queue(channel ->
-                                channel.sendMessage("✅ Your Minecraft account `" + player.getName() +
-                                        "` has been successfully linked to this Discord account!").queue()
-                        )
+                                user.openPrivateChannel().queue(channel ->
+                                                channel.sendMessage("✅ Your Minecraft account `" + player.getName() + "` has been successfully linked to this Discord account!").queue(),
+                                        failure -> plugin.getLogger().warning("Failed to open DM channel for user " + discordId + ": " + failure.getMessage())
+                                ),
+                        failure -> plugin.getLogger().warning("Failed to retrieve Discord user " + discordId + ": " + failure.getMessage())
                 );
             }
         }
 
         plugin.getLogger().info("Player " + player.getName() + " successfully linked to Discord ID " + discordId);
+    }
+
+    private static String colorize(String message) {
+        return ChatColor.translateAlternateColorCodes('&', message);
     }
 }

@@ -13,85 +13,99 @@ import java.security.SecureRandom;
 public class LinkCommand extends Command {
 
     private static final int CODE_LENGTH = 6;
-    private static final int MAX_CODE = 1_000_000; // 6-digit code max
+    private static final int MAX_CODE = 1_000_000; // 6-digit max (from 000000 to 999999)
+    private static final long VERIFICATION_CODE_VALIDITY_MINUTES = 5;
+
     private final SecureRandom random = new SecureRandom();
 
     public LinkCommand() {
-        super("linkdiscord", null, "link"); // command name, permission (null = none), aliases
+        super("linkdiscord", null, "link");
     }
 
     @Override
     public void execute(CommandSender sender, String[] args) {
-        if (!(sender instanceof ProxiedPlayer)) {
-            sender.sendMessage(ChatColor.RED + "Only players can use this command.");
+        if (!(sender instanceof ProxiedPlayer player)) {
+            sender.sendMessage(colorize("&cOnly players can use this command."));
             return;
         }
 
-        ProxiedPlayer player = (ProxiedPlayer) sender;
         AquixLinkCoreBungee plugin = AquixLinkCoreBungee.getInstance();
         LinkStorage linkStorage = plugin.getLinkStorage();
 
         if (linkStorage == null) {
-            player.sendMessage(ChatColor.RED + "Internal error: link storage unavailable.");
+            player.sendMessage(colorize("&cInternal error: link storage unavailable."));
             plugin.getLogger().severe("LinkStorage instance is null in LinkCommand.");
             return;
         }
 
-        // Already linked
         if (linkStorage.isPlayerLinked(player.getUniqueId())) {
-            player.sendMessage(ChatColor.RED + "You are already linked to a Discord account. " +
-                    ChatColor.GREEN + "To unlink, use /unlinkdiscord.");
+            player.sendMessage(colorize("&cYou are already linked to a Discord account. &aTo unlink, use /unlinkdiscord."));
             return;
         }
 
-        // Pending verification exists? Check if expired
+        // Handle existing pending verification (check expiration and remove if expired)
         if (linkStorage.hasPendingVerification(player.getUniqueId())) {
             if (linkStorage.isVerificationExpired(player.getUniqueId())) {
-                // Remove expired pending verification so player can create a new one
                 linkStorage.removePendingVerification(player.getUniqueId());
             } else {
-                player.sendMessage(ChatColor.RED + "You already have a pending verification request.");
-                player.sendMessage(ChatColor.GRAY + "Check your Discord DM or use " +
-                        ChatColor.YELLOW + "/verifylink <code>" + ChatColor.GRAY + " to complete linking.");
+                player.sendMessage(colorize("&cYou already have a pending verification request."));
+                player.sendMessage(colorize("&7Check your Discord DM or use &e/verifylink <code> &7to complete linking."));
                 return;
             }
         }
 
-        // Validate command usage
+        // Validate command arguments
         if (args.length != 1) {
-            player.sendMessage(ChatColor.RED + "Usage: /linkdiscord <discord_id>");
+            player.sendMessage(colorize("&cUsage: /linkdiscord <discord_id>"));
             return;
         }
 
         String discordId = args[0];
 
-        // Validate Discord ID format
-        if (!discordId.matches("^\\d{17,20}$")) {
-            player.sendMessage(ChatColor.RED + "Invalid Discord ID. It should be a 17–20 digit number.");
+        if (!isValidDiscordId(discordId)) {
+            player.sendMessage(colorize("&cInvalid Discord ID. It should be a 17–20 digit number."));
             return;
         }
 
-        // Check if Discord ID is already linked to another player
         if (linkStorage.isDiscordIdLinked(discordId)) {
-            player.sendMessage(ChatColor.RED + "This Discord ID is already linked to another player.");
+            player.sendMessage(colorize("&cThis Discord ID is already linked to another player."));
             return;
         }
 
-        // Generate and store a 6-digit verification code
-        String code = String.format("%0" + CODE_LENGTH + "d", random.nextInt(MAX_CODE));
-        linkStorage.setPendingVerification(player.getUniqueId(), discordId, code);
+        // Generate verification code and save it
+        String verificationCode = generateVerificationCode();
+        linkStorage.setPendingVerification(player.getUniqueId(), discordId, verificationCode);
 
-        // Send Discord DM with the verification code
-        DiscordBot bot = plugin.getDiscordBot();
-        if (bot != null) {
-            bot.sendVerificationDM(discordId, player.getName(), code);
-            player.sendMessage(ChatColor.GREEN + "✅ A verification code has been generated and sent to your Discord DMs.");
+        // Inform player about next steps
+        player.sendMessage(colorize("&7Please enter this command in the Discord verification channel:"));
+        player.sendMessage(colorize("&7&l/verify " + verificationCode));
+
+        // Send DM via Discord bot
+        DiscordBot discordBot = plugin.getDiscordBot();
+        if (discordBot != null) {
+            discordBot.sendVerificationDM(discordId, player.getName(), verificationCode);
+            player.sendMessage(colorize("&aA verification code has also been sent to your Discord DMs."));
         } else {
-            player.sendMessage(ChatColor.YELLOW + "⚠ Verification code generated, but the Discord bot is offline.");
+            player.sendMessage(colorize("&e⚠ Verification code generated, but the Discord bot is currently offline."));
         }
 
-        // Remind in chat
-        player.sendMessage(ChatColor.GRAY + "Note: This code is valid for 5 minutes.");
-        player.sendMessage(ChatColor.GRAY + "If you didn't get a DM, make sure your privacy settings allow messages from server members.");
+        player.sendMessage(colorize("&7Note: This code is valid for " + VERIFICATION_CODE_VALIDITY_MINUTES + " minutes."));
+        player.sendMessage(colorize("&7If you didn't get a DM, ensure your Discord privacy settings allow messages from server members."));
+    }
+
+    // Helper method: colorize messages using & codes
+    private static String colorize(String message) {
+        return ChatColor.translateAlternateColorCodes('&', message);
+    }
+
+    // Helper method: validate Discord ID format (17 to 20 digits)
+    private static boolean isValidDiscordId(String discordId) {
+        return discordId != null && discordId.matches("^\\d{17,20}$");
+    }
+
+    // Helper method: generate a zero-padded 6-digit verification code
+    private String generateVerificationCode() {
+        int code = random.nextInt(MAX_CODE);
+        return String.format("%0" + CODE_LENGTH + "d", code);
     }
 }

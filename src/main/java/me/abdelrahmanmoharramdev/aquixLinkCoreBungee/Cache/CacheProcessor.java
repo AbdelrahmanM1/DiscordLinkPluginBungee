@@ -13,20 +13,20 @@ import java.util.logging.Logger;
  * Handles caching for linked Discord accounts and pending verifications.
  * This reduces database lookups and improves performance.
  *
- * Linked Players: UUID <-> Discord ID
- * Pending Verifications: UUID -> Verification Code
+ * <p><b>Linked Players:</b> UUID &lt;-&gt; Discord ID
+ * <br><b>Pending Verifications:</b> UUID -&gt; Verification Code</p>
  */
 public class CacheProcessor {
 
     private static final Logger LOGGER = Logger.getLogger(CacheProcessor.class.getName());
 
-    // Linked players: UUID -> Discord ID
+    // Cache for linked players: UUID -> Discord ID
     private final Cache<UUID, String> linkedCache;
 
-    // Reverse mapping: Discord ID -> UUID
+    // Reverse cache: Discord ID -> UUID
     private final Cache<String, UUID> reverseLinkedCache;
 
-    // Pending verifications: UUID -> verification code
+    // Cache for pending verifications: UUID -> verification code
     private final Cache<UUID, String> pendingVerificationCache;
 
     /**
@@ -65,7 +65,8 @@ public class CacheProcessor {
     }
 
     /**
-     * Default constructor with 10 min for linked data, 5 min for pending verifications,
+     * Default constructor with 10 minutes for linked data,
+     * 5 minutes for pending verifications,
      * and maximum 1000 entries cache size.
      */
     public CacheProcessor() {
@@ -75,10 +76,10 @@ public class CacheProcessor {
     /* ===================== LINKED PLAYERS ===================== */
 
     /**
-     * Caches a linked player and their Discord ID.
+     * Cache a linked player and their Discord ID.
      *
-     * @param uuid      Minecraft player's UUID.
-     * @param discordId Discord ID as a string.
+     * @param uuid      Minecraft player's UUID
+     * @param discordId Discord ID as a String
      */
     public void cacheLinkedPlayer(UUID uuid, String discordId) {
         if (uuid == null || discordId == null) return;
@@ -87,10 +88,10 @@ public class CacheProcessor {
     }
 
     /**
-     * Gets the cached Discord ID for a player.
+     * Get the cached Discord ID for a player.
      *
-     * @param uuid Minecraft player's UUID.
-     * @return Cached Discord ID or null if not cached.
+     * @param uuid Minecraft player's UUID
+     * @return Cached Discord ID or null if none cached
      */
     public String getCachedDiscordId(UUID uuid) {
         if (uuid == null) return null;
@@ -98,10 +99,10 @@ public class CacheProcessor {
     }
 
     /**
-     * Gets the cached UUID for a Discord user.
+     * Get the cached UUID for a Discord user.
      *
-     * @param discordId Discord user ID.
-     * @return Cached UUID or null if not cached.
+     * @param discordId Discord user ID
+     * @return Cached UUID or null if none cached
      */
     public UUID getCachedUuidByDiscordId(String discordId) {
         if (discordId == null) return null;
@@ -111,8 +112,8 @@ public class CacheProcessor {
     /**
      * Checks if a player is cached as linked.
      *
-     * @param uuid Minecraft player's UUID.
-     * @return true if cached as linked, false otherwise.
+     * @param uuid Minecraft player's UUID
+     * @return true if cached as linked, false otherwise
      */
     public boolean isPlayerLinked(UUID uuid) {
         if (uuid == null) return false;
@@ -120,9 +121,9 @@ public class CacheProcessor {
     }
 
     /**
-     * Removes a linked player from the cache.
+     * Remove a linked player from the cache.
      *
-     * @param uuid Minecraft player's UUID.
+     * @param uuid Minecraft player's UUID
      */
     public void invalidateLinkedPlayer(UUID uuid) {
         if (uuid == null) return;
@@ -136,10 +137,10 @@ public class CacheProcessor {
     /* ===================== PENDING VERIFICATIONS ===================== */
 
     /**
-     * Caches a pending verification code for a player.
+     * Cache a pending verification code for a player.
      *
-     * @param uuid Minecraft player's UUID.
-     * @param code Verification code.
+     * @param uuid Minecraft player's UUID
+     * @param code Verification code
      */
     public void cachePendingVerification(UUID uuid, String code) {
         if (uuid == null || code == null) return;
@@ -147,10 +148,10 @@ public class CacheProcessor {
     }
 
     /**
-     * Gets the cached pending verification code for a player.
+     * Get the cached pending verification code for a player.
      *
-     * @param uuid Minecraft player's UUID.
-     * @return Cached verification code or null if not cached.
+     * @param uuid Minecraft player's UUID
+     * @return Cached verification code or null if none cached
      */
     public String getCachedPendingCode(UUID uuid) {
         if (uuid == null) return null;
@@ -160,8 +161,8 @@ public class CacheProcessor {
     /**
      * Checks if a player has a pending verification code cached.
      *
-     * @param uuid Minecraft player's UUID.
-     * @return true if a pending verification is cached, false otherwise.
+     * @param uuid Minecraft player's UUID
+     * @return true if a pending verification is cached, false otherwise
      */
     public boolean hasPendingVerification(UUID uuid) {
         if (uuid == null) return false;
@@ -169,9 +170,9 @@ public class CacheProcessor {
     }
 
     /**
-     * Removes a pending verification entry from the cache.
+     * Remove a pending verification entry from the cache.
      *
-     * @param uuid Minecraft player's UUID.
+     * @param uuid Minecraft player's UUID
      */
     public void invalidatePendingVerification(UUID uuid) {
         if (uuid == null) return;

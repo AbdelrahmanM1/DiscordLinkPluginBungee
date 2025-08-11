@@ -4,6 +4,7 @@ import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.AquixLinkCoreBungee;
 
 import java.io.File;
 import java.sql.*;
+import java.util.logging.Level;
 
 /**
  * Handles SQLite database connection and schema initialization.
@@ -20,23 +21,22 @@ public class DatabaseManager {
 
     /**
      * Initializes the database connection and creates tables if needed.
+     * Safe to call multiple times.
      */
     private void initialize() {
         try {
-            // Load SQLite JDBC driver
             Class.forName("org.sqlite.JDBC");
 
-            // Ensure data folder exists
             File dataFolder = plugin.getDataFolder();
             if (!dataFolder.exists() && !dataFolder.mkdirs()) {
                 throw new IllegalStateException("Failed to create plugin data folder!");
             }
 
-            // Open connection to SQLite database file
             File dbFile = new File(dataFolder, "links.db");
-            connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
+            String jdbcUrl = "jdbc:sqlite:" + dbFile.getAbsolutePath();
+            connection = DriverManager.getConnection(jdbcUrl);
+            connection.setAutoCommit(false); // for atomic schema setup
 
-            // Create tables and indexes if not exist
             try (Statement stmt = connection.createStatement()) {
                 stmt.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS links (
@@ -50,7 +50,7 @@ public class DatabaseManager {
                         uuid TEXT PRIMARY KEY,
                         discord_id TEXT NOT NULL,
                         code TEXT NOT NULL,
-                        created_at TEXT NOT NULL
+                        created_at INTEGER NOT NULL
                     );
                 """);
 
@@ -58,20 +58,31 @@ public class DatabaseManager {
                     CREATE INDEX IF NOT EXISTS idx_pending_discord_id
                     ON pending_verifications (discord_id);
                 """);
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
             }
 
             plugin.getLogger().info("SQLite database initialized successfully.");
+
         } catch (ClassNotFoundException e) {
-            plugin.getLogger().severe("SQLite JDBC driver not found! " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "SQLite JDBC driver not found!", e);
         } catch (SQLException e) {
-            plugin.getLogger().severe("SQL error during database initialization: " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "SQL error during database initialization.", e);
         } catch (Exception e) {
-            plugin.getLogger().severe("Unexpected error during database initialization: " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Unexpected error during database initialization.", e);
+        } finally {
+            try {
+                if (connection != null && !connection.getAutoCommit()) {
+                    connection.setAutoCommit(true);
+                }
+            } catch (SQLException ignored) {}
         }
     }
 
     /**
-     * Gets the current connection. Reinitializes if closed or null.
+     * Gets the current SQLite connection, reinitializing if closed or null.
      * @return the SQLite connection
      */
     public Connection getConnection() {
@@ -80,7 +91,7 @@ public class DatabaseManager {
                 initialize();
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Error checking database connection: " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Error checking database connection.", e);
         }
         return connection;
     }

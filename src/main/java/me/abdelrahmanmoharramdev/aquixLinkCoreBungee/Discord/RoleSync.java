@@ -8,7 +8,7 @@ import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.types.InheritanceNode;
 
 import java.util.*;
-import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class RoleSync {
@@ -30,87 +30,65 @@ public class RoleSync {
      */
     public void syncPlayerRoles(UUID playerUuid, Member member) {
         // Load role mappings from config under "rolesync", excluding "default-rank"
-        Map<String, String> roleMappings = plugin.getConfig().getSection("rolesync").getKeys()
-                .stream()
-                .filter(key -> !key.equalsIgnoreCase("default-rank"))
-                .collect(Collectors.toMap(
-                        discordRoleId -> discordRoleId,
-                        discordRoleId -> plugin.getConfig().getString("rolesync." + discordRoleId)
-                ));
-
-        // Get the default rank from config, defaulting to "default"
+        Map<String, String> roleMappings = getRoleMappings();
         String defaultRank = plugin.getConfig().getString("rolesync.default-rank", "default");
 
         luckPerms.getUserManager().loadUser(playerUuid).thenAccept(user -> {
-            boolean updated = false;
-
-            // Build a set of mapped MC groups for quick lookup
+            Set<String> currentGroups = getUserGroups(user);
             Set<String> mappedMcGroups = new HashSet<>(roleMappings.values());
 
-            // Add groups for Discord roles the user has (if missing)
+            boolean updated = false;
+
+            // Add missing groups based on Discord roles
             for (Map.Entry<String, String> entry : roleMappings.entrySet()) {
                 String discordRoleId = entry.getKey();
                 String mcGroup = entry.getValue();
 
-                boolean hasDiscordRole = member.getRoles().stream()
-                        .map(Role::getId)
-                        .anyMatch(id -> id.equals(discordRoleId));
-
-                boolean hasGroup = user.getNodes().stream()
-                        .filter(node -> node instanceof InheritanceNode)
-                        .map(node -> ((InheritanceNode) node).getGroupName())
-                        .anyMatch(group -> group.equalsIgnoreCase(mcGroup));
+                boolean hasDiscordRole = hasDiscordRole(member, discordRoleId);
+                boolean hasGroup = currentGroups.stream().anyMatch(g -> g.equalsIgnoreCase(mcGroup));
 
                 if (hasDiscordRole && !hasGroup) {
                     user.data().add(InheritanceNode.builder(mcGroup).build());
                     updated = true;
+                    plugin.getLogger().info("Added MC group '" + mcGroup + "' for user " + member.getEffectiveName());
                 }
             }
 
-            // Remove only mapped groups if user no longer has the corresponding Discord role
+            // Remove mapped groups if Discord role no longer exists
             for (String mcGroup : mappedMcGroups) {
                 boolean hasDiscordRoleForGroup = roleMappings.entrySet().stream()
                         .filter(e -> e.getValue().equalsIgnoreCase(mcGroup))
-                        .anyMatch(e -> member.getRoles().stream()
-                                .map(Role::getId)
-                                .anyMatch(id -> id.equals(e.getKey())));
+                        .anyMatch(e -> hasDiscordRole(member, e.getKey()));
 
-                boolean hasGroup = user.getNodes().stream()
-                        .filter(node -> node instanceof InheritanceNode)
-                        .map(node -> ((InheritanceNode) node).getGroupName())
-                        .anyMatch(group -> group.equalsIgnoreCase(mcGroup));
+                boolean hasGroup = currentGroups.stream().anyMatch(g -> g.equalsIgnoreCase(mcGroup));
 
                 if (!hasDiscordRoleForGroup && hasGroup) {
                     user.data().remove(InheritanceNode.builder(mcGroup).build());
                     updated = true;
+                    plugin.getLogger().info("Removed MC group '" + mcGroup + "' for user " + member.getEffectiveName());
                 }
             }
 
-            // Check if user has any mapped groups
-            boolean hasAnyMappedGroup = user.getNodes().stream()
-                    .filter(node -> node instanceof InheritanceNode)
-                    .map(node -> ((InheritanceNode) node).getGroupName())
+            boolean hasAnyMappedGroup = currentGroups.stream()
                     .anyMatch(mappedMcGroups::contains);
 
-            // Check if user has the default rank
-            boolean hasDefaultGroup = user.getNodes().stream()
-                    .filter(node -> node instanceof InheritanceNode)
-                    .map(node -> ((InheritanceNode) node).getGroupName())
-                    .anyMatch(group -> group.equalsIgnoreCase(defaultRank));
+            boolean hasDefaultGroup = currentGroups.stream()
+                    .anyMatch(g -> g.equalsIgnoreCase(defaultRank));
 
-            // Assign default rank if no mapped groups exist
+            // Add default rank if no mapped groups exist
             if (!hasAnyMappedGroup && !hasDefaultGroup) {
                 user.data().add(InheritanceNode.builder(defaultRank).build());
                 updated = true;
+                plugin.getLogger().info("Added default rank '" + defaultRank + "' to user " + member.getEffectiveName());
             }
 
             // Remove default rank if other groups exist
             if (hasAnyMappedGroup && hasDefaultGroup) {
                 user.data().remove(InheritanceNode.builder(defaultRank).build());
                 updated = true;
+                plugin.getLogger().info("Removed default rank '" + defaultRank + "' from user " + member.getEffectiveName());
             }
 
-            // Save changes if needed
             if (updated) {
                 luckPerms.getUserManager().saveUser(user);
                 plugin.getLogger().info("Synced roles for Discord user '" + member.getEffectiveName() + "' (MC UUID: " + playerUuid + ")");
@@ -119,5 +97,28 @@ public class RoleSync {
             plugin.getLogger().severe("Failed to load LuckPerms user for UUID " + playerUuid + ": " + ex.getMessage());
             return null;
         });
+    }
+
+    private Map<String, String> getRoleMappings() {
+        return plugin.getConfig().getSection("rolesync").getKeys()
+                .stream()
+                .filter(key -> !key.equalsIgnoreCase("default-rank"))
+                .collect(Collectors.toMap(
+                        key -> key,
+                        key -> plugin.getConfig().getString("rolesync." + key)
+                ));
+    }
+
+    private boolean hasDiscordRole(Member member, String discordRoleId) {
+        return member.getRoles().stream()
+                .map(Role::getId)
+                .anyMatch(id -> id.equals(discordRoleId));
+    }
+
+    private Set<String> getUserGroups(User user) {
+        return user.getNodes().stream()
+                .filter(node -> node instanceof InheritanceNode)
+                .map(node -> ((InheritanceNode) node).getGroupName())
+                .collect(Collectors.toSet());
     }
 }
