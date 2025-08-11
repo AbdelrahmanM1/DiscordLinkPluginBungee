@@ -49,7 +49,7 @@ public class LinkCommand extends Command {
                 linkStorage.removePendingVerification(player.getUniqueId());
             } else {
                 player.sendMessage(colorize("&cYou already have a pending verification request."));
-                player.sendMessage(colorize("&7Check your Discord DM or use &e/verifylink <code> &7to complete linking."));
+                player.sendMessage(colorize("&7Check your Discord DM  to  complete linking."));
                 return;
             }
         }
@@ -83,7 +83,7 @@ public class LinkCommand extends Command {
         // Send DM via Discord bot
         DiscordBot discordBot = plugin.getDiscordBot();
         if (discordBot != null) {
-            discordBot.sendVerificationDM(discordId, player.getName(), verificationCode);
+            discordBot.sendVerificationDM(String.valueOf(plugin.getGuildId()), discordId, player.getName(), verificationCode);
             player.sendMessage(colorize("&aA verification code has also been sent to your Discord DMs."));
         } else {
             player.sendMessage(colorize("&e⚠ Verification code generated, but the Discord bot is currently offline."));

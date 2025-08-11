@@ -5,13 +5,18 @@ import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.storage.LinkStorage;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+
+import net.md_5.bungee.api.ChatColor;
+import net.md_5.bungee.api.chat.TextComponent;
 
 import javax.security.auth.login.LoginException;
 import java.awt.*;
@@ -30,7 +35,7 @@ public class DiscordBot extends ListenerAdapter {
     private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
     private static final long COMMAND_COOLDOWN_MS = TimeUnit.SECONDS.toMillis(30);
 
-    // Localization messages with keys and language variants
+    // Localization messages
     private static final Map<String, String[]> MESSAGES = Map.ofEntries(
             Map.entry("no_pending_verification", new String[]{
                     "❌ No pending verification found for your Discord account.",
@@ -94,9 +99,6 @@ public class DiscordBot extends ListenerAdapter {
         return jda;
     }
 
-    /**
-     * Sends the initial verification prompt in the verification channel.
-     */
     private void sendPromptMessage() {
         TextChannel channel = jda.getTextChannelById(verificationChannelId);
         if (channel == null) {
@@ -118,8 +120,12 @@ public class DiscordBot extends ListenerAdapter {
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!"verify".equalsIgnoreCase(event.getName())) return;
 
-        if (event.getChannel().getIdLong() != verificationChannelId) {
-            event.reply("❌ Please use this command only in the designated verification channel.")
+        long channelId = event.getChannel().getIdLong();
+        boolean isVerificationChannel = channelId == verificationChannelId;
+        boolean isPrivateChannel = event.getChannel().getType() == ChannelType.PRIVATE;
+
+        if (!isVerificationChannel && !isPrivateChannel) {
+            event.reply("❌ Please use this command only in the designated verification channel or via DM.")
                     .setEphemeral(true)
                     .queue();
             return;
@@ -141,44 +147,40 @@ public class DiscordBot extends ListenerAdapter {
         setCooldown(discordId);
     }
 
-    /**
-     * Sends the verification code DM to user, falls back to public message mentioning user if DMs are closed.
-     */
-    public void sendVerificationDM(String discordId, String minecraftName, String code) {
-        if (jda == null) return;
-
-        jda.retrieveUserById(discordId).queue(user -> {
-            user.openPrivateChannel().queue(channel -> {
-                String dmMessage = String.format(
-                        "Hello %s!\nYour Minecraft account `%s` is attempting to link with this Discord account.\n" +
-                                "Please verify yourself by typing `/verify %s` in the verification channel.\nThis code is valid for 5 minutes.",
-                        user.getName(), minecraftName, code);
-
-                channel.sendMessage(dmMessage).queue(null, throwable -> sendFallbackMentionMessage(discordId));
-            }, failure -> sendFallbackMentionMessage(discordId));
-        }, failure -> plugin.getLogger().warning("Discord user not found with ID " + discordId));
-    }
-
-    /**
-     * Fallback: send a mention in the verification channel without exposing code publicly.
-     */
-    private void sendFallbackMentionMessage(String discordUserId) {
-        TextChannel channel = jda.getTextChannelById(verificationChannelId);
-        if (channel == null) {
-            plugin.getLogger().warning("Verification channel not found for fallback message.");
+    public void sendVerificationDM(String guildId, String discordId, String playerName, String code) {
+        Guild guild = jda.getGuildById(guildId);
+        if (guild == null) {
+            plugin.getLogger().warning("Could not find Guild with ID: " + guildId);
             return;
         }
 
-        String message = String.format(
-                "<@!%s> Please enable your DMs to receive verification instructions privately.",
-                discordUserId);
-
-        channel.sendMessage(message).queue();
+        guild.retrieveMemberById(discordId).queue(member -> {
+            member.getUser().openPrivateChannel().queue(channel -> {
+                MessageEmbed embed = createVerificationEmbed(playerName, code);
+                channel.sendMessageEmbeds(embed)
+                        .queue(
+                                success -> plugin.getLogger().info("Successfully sent verification DM to " + member.getEffectiveName()),
+                                failure -> plugin.getLogger().warning("Failed to send DM to " + member.getEffectiveName() + ". Error: " + failure.getMessage())
+                        );
+            }, failure -> plugin.getLogger().warning("Failed to open private channel with " + member.getEffectiveName() + ". Error: " + failure.getMessage()));
+        }, failure -> {
+            plugin.getLogger().warning("Failed to retrieve member with ID " + discordId + " from guild " + guild.getName() + ". Error: " + failure.getMessage());
+        });
     }
 
-    /**
-     * Handle the /verify command logic.
-     */
+    private MessageEmbed createVerificationEmbed(String playerName, String code) {
+        return new EmbedBuilder()
+                .setTitle("Minecraft Account Verification")
+                .setDescription(String.format(
+                        "Hello %s!\nYour Minecraft account `%s` is attempting to link with this Discord account.\n" +
+                                "Please verify yourself by typing `/verify %s` in the verification channel.\n" +
+                                "This code is valid for 5 minutes.",
+                        playerName, playerName, code))
+                .setColor(Color.CYAN)
+                .setTimestamp(Instant.now())
+                .build();
+    }
+
     private void handleVerification(SlashCommandInteractionEvent event, String discordId, String code) {
         LinkStorage linkStorage = plugin.getLinkStorage();
 
@@ -215,6 +217,12 @@ public class DiscordBot extends ListenerAdapter {
         event.reply(getMessage("success", DEFAULT_LANG_INDEX))
                 .setEphemeral(true)
                 .queue();
+
+        var proxy = plugin.getProxy();
+        var mcPlayer = proxy.getPlayer(uuid);
+        if (mcPlayer != null) {
+            mcPlayer.sendMessage(new TextComponent(ChatColor.GREEN + "You are successfully linked with Discord: " + event.getUser().getName()));
+        }
 
         plugin.getLogger().info("Discord verification succeeded for user ID " + discordId);
     }

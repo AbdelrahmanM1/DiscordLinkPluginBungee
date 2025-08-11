@@ -7,6 +7,9 @@ discord-token: "YOUR_DISCORD_BOT_TOKEN"
 # Discord channel ID where verification messages will be sent
 discord-verification-channel-id: 123456789012345678
 
+# Discord Guild ID
+discord-guild-id: 123456789012345678
+
 # Roles and Ranks mapping for syncing Discord roles to Minecraft ranks
 rolesync:
   # Discord Role ID : Minecraft rank name

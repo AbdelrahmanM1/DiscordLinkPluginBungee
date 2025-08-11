@@ -7,6 +7,5 @@ me\abdelrahmanmoharramdev\aquixLinkCoreBungee\commands\LinkCommand.class
 me\abdelrahmanmoharramdev\aquixLinkCoreBungee\database\DatabaseManager.class
 me\abdelrahmanmoharramdev\aquixLinkCoreBungee\Discord\DiscordBot.class
 me\abdelrahmanmoharramdev\aquixLinkCoreBungee\Discord\RoleSync.class
-me\abdelrahmanmoharramdev\aquixLinkCoreBungee\commands\VerifyLinkCommand.class
 me\abdelrahmanmoharramdev\aquixLinkCoreBungee\cache\CacheProcessor.class
 me\abdelrahmanmoharramdev\aquixLinkCoreBungee\storage\LinkStorage.class

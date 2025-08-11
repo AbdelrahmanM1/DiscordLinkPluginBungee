@@ -6,7 +6,6 @@ import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.Listeners.PlayerJoinListene
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands.LinkCommand;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands.ReloadLinkCommand;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands.UnlinkCommand;
-import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.commands.VerifyLinkCommand;
 import me.abdelrahmanmoharramdev.aquixLinkCoreBungee.storage.LinkStorage;
 import net.luckperms.api.LuckPerms;
 import net.md_5.bungee.api.ProxyServer;
@@ -47,7 +46,7 @@ public final class AquixLinkCoreBungee extends Plugin {
         this.linkStorage = new LinkStorage(this);
         this.roleSync = new RoleSync(this, luckPerms);
 
-        // Start Discord bot async to prevent blocking server startup
+        // Start Discord bot asynchronously
         startDiscordBot();
 
         registerCommandsAndListeners();
@@ -92,8 +91,6 @@ public final class AquixLinkCoreBungee extends Plugin {
         proxy.getPluginManager().registerCommand(this, new LinkCommand());
         proxy.getPluginManager().registerCommand(this, new UnlinkCommand());
         proxy.getPluginManager().registerCommand(this, new ReloadLinkCommand());
-        proxy.getPluginManager().registerCommand(this, new VerifyLinkCommand());
-
         proxy.getPluginManager().registerListener(this, new PlayerJoinListener());
     }
 
@@ -147,6 +144,12 @@ public final class AquixLinkCoreBungee extends Plugin {
                 getLogger().log(Level.SEVERE, "Failed to start Discord bot.", e);
             }
         });
+    }
+
+    // New method to get Discord guild/server ID from config.yml
+    public long getGuildId() {
+        if (config == null) return 0L;
+        return config.getLong("discord-guild-id", 0L);
     }
 
     public LinkStorage getLinkStorage() {
